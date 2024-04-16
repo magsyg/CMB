@@ -7,15 +7,52 @@ __kernel void naive_kernel(
 )
 {
     // global 2D NDRange sizes (size of the image)
-    ushort num_cols = get_global_size(0);
-    ushort num_rows = get_global_size(1);
     // point in currently being executed (each pixel)
     ushort senterY = get_global_id(0);
-   
+    
+    int pixelPos = (width* senterY + size);
+    unsigned short  bottomY = senterY-size;
+    unsigned short topY = senterY+size;
+    int numElements = (2*size+1)*(2*size+1);
+    
+    if(senterY > size && senterY < height-size) {
+        float3 sum = (float3) (0.0f, 0.0f, 0.0f);
+	for(unsigned short  x = 0; x <= (size+size); x++) {
+		for(unsigned short y = bottomY; y <= topY; y++) {
+			int offsetOfThePixel = (width * y + x);
+			sum+=vload3(offsetOfThePixel, in_image);
+		}
+	}
+	
+        vstore3(sum / numElements, pixelPos, out_image);
+	
+	int yRow = width * bottomY;
+	
+	for(unsigned short senterX = size+1; senterX < width-size; senterX++) {
+		// For each pixel we compute the magic number
+		pixelPos = (width * senterY + senterX);
+		
+		unsigned short leftX = senterX-size-1;
+		unsigned short  rightX = senterX+size;
+		int leftOffset = (yRow+ leftX);
+		int rightOffset = (yRow + rightX);
+		
+		for(int y = bottomY; y <= topY; y++) {
+			sum+=vload3(rightOffset, in_image);
+			sum-=vload3(leftOffset, in_image);
+			leftOffset+=width;
+			rightOffset+=width;
+		}
+		vstore3(sum / numElements, pixelPos, out_image);
+		
+	}
+	
+ }
+   	/*
     ushort startY = ((senterY-size) > 0)? (senterY-size): 0;
   
     ushort endY = senterY+size+1;
-    if (endY >= height) endY = height;//((senterY+size) < height) ? (start+size+1): height;
+    if (endY >= height) endY = height;
     int start = width * (startY-1);
     int pixelPos = (width * senterY);
     float3 sum = (float3) (0.0f, 0.0f, 0.0f);
@@ -36,7 +73,7 @@ __kernel void naive_kernel(
 
     for(ushort x = 1; x < size+2; x++) {
   
-        int offsetOfThePixel = (start + x +size);
+        int offsetOfThePixel = (start + x + size);
         pixelPos++;
          
         for(ushort y = startY; y < endY; y++) {
@@ -68,7 +105,7 @@ __kernel void naive_kernel(
     }
 
     // End of accumulation
-    for(ushort x = num_cols-size; x < num_cols; x++) {
+    for(ushort x = width-size; x < width; x++) {
         pixelPos++;
         int leftOffset = (start+x-size+1);
         for(ushort y = startY; y < endY; y++) {
@@ -77,5 +114,5 @@ __kernel void naive_kernel(
         }
         vstore3(sum / ((width-x+size)*(endY-startY)), pixelPos, out_image);
     }
-
+	*/
 }
