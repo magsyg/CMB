@@ -162,7 +162,7 @@ public:
 
         // select device
         std::vector<Device> all_devices;
-        default_platform.getDevices(CL_DEVICE_TYPE_ANY, &all_devices);
+        default_platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
         if (all_devices.empty()){
             errorAndExit("No devices found.");
         }
@@ -259,7 +259,9 @@ private:
         // set call arguments
         naive_kernel.setArg(0, src);
         naive_kernel.setArg(1, dst);
-        naive_kernel.setArg(2, size);
+        naive_kernel.setArg(2, image->x);
+        naive_kernel.setArg(3, image->y);
+        naive_kernel.setArg(4, size);
         // call 2D kernel
         queue.enqueueNDRangeKernel(
                 naive_kernel, // kernel to queue
