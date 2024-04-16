@@ -14,19 +14,14 @@ __kernel void naive_kernel(
     unsigned short bottomY = senterY-size;
     unsigned short topY = senterY+size;
     
-    
-    ushort startY = ((senterY-size) > 0)? (senterY-size): 0;
-  
-    ushort endY = senterY+size;
-    if (endY >= height ) endY = height;
-    if (endY != topY && !(endY >= height)) {
-     printf("%d %d %d %d\n", endY, topY, senterY, size);
-     }
-    int numElements = (2*size+1)*(endY-topY);
-    
+
+    if (bottomY < 0 ) bottomY = 0;
+    if (topY > height ) topY = height;
+    int numElements = (2*size+1)*(topY-bottomY);
+
 	float3 sum = (float3) (0.0f, 0.0f, 0.0f);
 	for(unsigned short  x = 0; x <= (size+size); x++) {
-		for(unsigned short y = bottomY; y <= topY; y++) {
+		for(unsigned short y = bottomY; y < topY; y++) {
 			int offsetOfThePixel = (width * y + x);
 			sum+=vload3(offsetOfThePixel, in_image);
 		}
@@ -45,7 +40,7 @@ __kernel void naive_kernel(
 		int leftOffset = (yRow+ leftX);
 		int rightOffset = (yRow + rightX);
 
-		for(int y = bottomY; y <= topY; y++) {
+		for(int y = bottomY; y < topY; y++) {
 			sum+=vload3(rightOffset, in_image);
 			sum-=vload3(leftOffset, in_image);
 			leftOffset+=width;
