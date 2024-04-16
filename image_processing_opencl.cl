@@ -31,20 +31,20 @@ __kernel void naive_kernel(
         }
     }
     // Fill accumulation
-    vstore3(sum / (size+1)*(endY-startY), pixelPos, out_image);
- 
+
+    vstore3(sum / ((size+1)*(endY-startY)), pixelPos, out_image);
+
     for(ushort x = 1; x < size+1; x++) {
   
-        int offsetOfThePixel = (start + x);
+        int offsetOfThePixel = (start + x +size);
         pixelPos++;
          
         for(ushort y = startY; y < endY; y++) {
             // Now we can begin
             offsetOfThePixel+=width;
             sum += vload3(offsetOfThePixel, in_image);
-            // Keep track of how many values we have included
         }  
-        vstore3(sum / (size+1+x)*(endY-startY), pixelPos, out_image);
+        vstore3(sum / ((size+1+x)*(endY-startY)), pixelPos, out_image);
     }
     
     // Full accumulation
@@ -64,7 +64,7 @@ __kernel void naive_kernel(
             sum += vload3(rightOffset, in_image);
             
         }
-        vstore3(sum / count, pixelPos, out_image);
+        vstore3(sum/count, pixelPos, out_image);
 	
     }
     
@@ -72,12 +72,12 @@ __kernel void naive_kernel(
     // End of accumulation
     for(ushort x = num_cols-size; x < num_cols; x++) {
         pixelPos++;
-        int leftOffset = (start - size+1);
+        int leftOffset = (start+x- size+1);
         for(ushort y = startY; y < endY; y++) {
             leftOffset+=num_cols;
             sum -= vload3(leftOffset, in_image);
         }
         vstore3(sum / (num_cols-x+size)*(endY-startY), pixelPos, out_image);
     }
-   */
+ 	*/
 }
