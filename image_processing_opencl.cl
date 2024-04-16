@@ -16,7 +16,7 @@ __kernel void naive_kernel(
   
     ushort endY = senterY+size+1;
     if (endY >= height) endY = height;//((senterY+size) < height) ? (start+size+1): height;
-    int start = num_cols * (startY-1);
+    int start = width * (startY-1);
     int pixelPos = (width * senterY);
     float3 sum = (float3) (0.0f, 0.0f, 0.0f);
     // Start accumulation
@@ -25,7 +25,7 @@ __kernel void naive_kernel(
         int offsetOfThePixel = (start + x);
         for(ushort y = startY; y < endY; y++) {
             // Now we can begin
-            offsetOfThePixel+=num_cols;
+            offsetOfThePixel+=width;
             sum += vload3(offsetOfThePixel, in_image);
             // Keep track of how many values we have included
         }
@@ -40,7 +40,7 @@ __kernel void naive_kernel(
          
         for(ushort y = startY; y < endY; y++) {
             // Now we can begin
-            offsetOfThePixel+=num_cols;
+            offsetOfThePixel+=width;
             sum += vload3(offsetOfThePixel, in_image);
             // Keep track of how many values we have included
         }  
@@ -50,12 +50,13 @@ __kernel void naive_kernel(
     // Full accumulation
     int count = (2*size+1)*(endY-startY);
     
-    for(ushort x = 1; x < width-size; x++) {
+
+    for(ushort x = size+1; x < width-size; x++) {
     	
         pixelPos++;
-        int leftOffset = (start - size+1);
-        int rightOffset = (start + size);
-        
+        int leftOffset = (start+x -size-1);
+        int rightOffset = (start+x+size);
+	
         for(ushort y = startY; y < endY; y++) {
             leftOffset+=width;
             rightOffset+=width;
@@ -64,8 +65,9 @@ __kernel void naive_kernel(
             
         }
         vstore3(sum / count, pixelPos, out_image);
-
+	
     }
+    
 	/*
     // End of accumulation
     for(ushort x = num_cols-size; x < num_cols; x++) {
