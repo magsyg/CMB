@@ -11,32 +11,40 @@ __kernel void naive_kernel(
     ushort senterY = get_global_id(0);
     
     int pixelPos = (width* senterY + size);
-    unsigned short  bottomY = senterY-size;
+    unsigned short bottomY = senterY-size;
     unsigned short topY = senterY+size;
-    int numElements = (2*size+1)*(2*size+1);
     
-    if(senterY > size && senterY < height-size) {
-        float3 sum = (float3) (0.0f, 0.0f, 0.0f);
+    
+    ushort startY = ((senterY-size) > 0)? (senterY-size): 0;
+  
+    ushort endY = senterY+size;
+    if (endY >= height ) endY = height;
+    if (endY != topY && !(endY >= height)) {
+     printf("%d %d %d %d\n", endY, topY, senterY, size);
+     }
+    int numElements = (2*size+1)*(endY-topY);
+    
+	float3 sum = (float3) (0.0f, 0.0f, 0.0f);
 	for(unsigned short  x = 0; x <= (size+size); x++) {
 		for(unsigned short y = bottomY; y <= topY; y++) {
 			int offsetOfThePixel = (width * y + x);
 			sum+=vload3(offsetOfThePixel, in_image);
 		}
-	}
-	
-        vstore3(sum / numElements, pixelPos, out_image);
-	
-	int yRow = width * bottomY;
-	
-	for(unsigned short senterX = size+1; senterX < width-size; senterX++) {
+		}
+
+		vstore3(sum / numElements, pixelPos, out_image);
+
+		int yRow = width * bottomY;
+
+		for(unsigned short senterX = size+1; senterX < width-size; senterX++) {
 		// For each pixel we compute the magic number
 		pixelPos = (width * senterY + senterX);
-		
+
 		unsigned short leftX = senterX-size-1;
 		unsigned short  rightX = senterX+size;
 		int leftOffset = (yRow+ leftX);
 		int rightOffset = (yRow + rightX);
-		
+
 		for(int y = bottomY; y <= topY; y++) {
 			sum+=vload3(rightOffset, in_image);
 			sum-=vload3(leftOffset, in_image);
@@ -44,10 +52,9 @@ __kernel void naive_kernel(
 			rightOffset+=width;
 		}
 		vstore3(sum / numElements, pixelPos, out_image);
-		
+
 	}
 	
- }
    	/*
     ushort startY = ((senterY-size) > 0)? (senterY-size): 0;
   
