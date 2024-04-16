@@ -266,8 +266,8 @@ private:
         queue.enqueueNDRangeKernel(
                 naive_kernel, // kernel to queue
                 NullRange, // use no offset
-                NDRange(1, image->y), // 2D kernel
-                NDRange(8,8), // use no local range
+                NDRange(image->y, 1), // 2D kernel
+                NDRange(8,1), // use no local range
                 nullptr, // we use the queue in sequential mode so we don't have to specify Events that need to finish before
                 &events.back().second // Event to use for profiling
         );

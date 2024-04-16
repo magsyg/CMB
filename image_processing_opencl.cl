@@ -10,14 +10,14 @@ __kernel void naive_kernel(
     ushort num_cols = get_global_size(0);
     ushort num_rows = get_global_size(1);
     // point in currently being executed (each pixel)
-    ushort senterY = get_global_id(1);
+    ushort senterY = get_global_id(0);
    
     ushort startY = ((senterY-size) > 0)? (senterY-size): 0;
   
     ushort endY = senterY+size+1;
     if (endY >= height) endY = height;//((senterY+size) < height) ? (start+size+1): height;
     int start = num_cols * (startY-1);
-    int pixelPos = (num_cols * senterY);
+    int pixelPos = (width * senterY);
     float3 sum = (float3) (0.0f, 0.0f, 0.0f);
     // Start accumulation
     
@@ -30,10 +30,9 @@ __kernel void naive_kernel(
             // Keep track of how many values we have included
         }
     }
-   
     // Fill accumulation
     vstore3(sum / (size+1)*(endY-startY), pixelPos, out_image);
-    
+ 
     for(ushort x = 1; x < size+1; x++) {
   
         int offsetOfThePixel = (start + x);
@@ -47,7 +46,7 @@ __kernel void naive_kernel(
         }  
         vstore3(sum / (size+1+x)*(endY-startY), pixelPos, out_image);
     }
-
+    
     // Full accumulation
     int count = (2*size+1)*(endY-startY);
     
@@ -67,7 +66,7 @@ __kernel void naive_kernel(
         vstore3(sum / count, pixelPos, out_image);
 
     }
-    
+	/*
     // End of accumulation
     for(ushort x = num_cols-size; x < num_cols; x++) {
         pixelPos++;
@@ -78,4 +77,5 @@ __kernel void naive_kernel(
         }
         vstore3(sum / (num_cols-x+size)*(endY-startY), pixelPos, out_image);
     }
+   */
 }
