@@ -54,7 +54,7 @@ __kernel void naive_kernel(
     for(ushort x = size+1; x < width-size; x++) {
     	
         pixelPos++;
-        int leftOffset = (start+x -size-1);
+        int leftOffset = (start+x-size);
         int rightOffset = (start+x+size);
 	
         for(ushort y = startY; y < endY; y++) {
@@ -67,17 +67,16 @@ __kernel void naive_kernel(
         vstore3(sum/count, pixelPos, out_image);
 	
     }
-    
-	/*
+
     // End of accumulation
     for(ushort x = num_cols-size; x < num_cols; x++) {
         pixelPos++;
-        int leftOffset = (start+x- size+1);
+        int leftOffset = (start+x-size+1);
         for(ushort y = startY; y < endY; y++) {
-            leftOffset+=num_cols;
+            leftOffset+=width;
             sum -= vload3(leftOffset, in_image);
         }
         vstore3(sum / (num_cols-x+size)*(endY-startY), pixelPos, out_image);
     }
- 	*/
+
 }
