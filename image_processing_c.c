@@ -151,62 +151,59 @@ void blurCornersIteration(AccurateImage *imageOut, AccurateImage *imageIn, int s
 void blurIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
 	
 	// Iterate over each pixel
-	float numElements = (2*size+1)*(2*size+1);
-	numElements = pow(numElements,-1);
-	blurCornersIteration(imageOut, imageIn, size);
+	short dim = (2*size+1);
+
+	float numElements = dim*dim;
+
+	float sigma = size/2;
+	float pi = 3.1415926;
+	float e = 2.71828;
+	float* gausMat = malloc(numElements * sizeof(double));
+	float expDen = (2*sigma*sigma);
+	float baseVal = pi*expDen;
+	float matrixSum = 0.0;
+	for (short x = 0; x < dim; x++) {
+		for (short y = 0; y < dim; y++) {
+			float res = (1/baseVal)* pow(e, -(pow((size-x),2) + pow((size-y),2))/expDen);
+			gausMat[dim*y + x] = res;
+			matrixSum += res;
+		}
+	}
+	for (short y = 0; y < dim; y++) {
+		for (short x = 0; x < dim; x++) {
+			gausMat[dim*y + x] = gausMat[dim*y + x]/matrixSum;
+		}
+	}
+	
 	#pragma omp parallel 
 	{
+		int count = 0;
 		unsigned short  thread_id = omp_get_thread_num();
 		unsigned short  n_threads = omp_get_num_threads();
 		unsigned short  tilePart = imageIn->y/n_threads;
 		unsigned short  tileStart = tilePart*thread_id + size;
 		unsigned short topY = ((tileStart+tilePart)< imageIn->y-size)?((tileStart+tilePart)):(imageIn->y-size);
 		for(unsigned short senterY = tileStart; senterY < topY; senterY++) {
-			int offsetOfThePixel = (imageIn->x * senterY + size);
-			unsigned short  bottomY = senterY-size;
-			unsigned short topY = senterY+size;
-			float sumR = 0, sumG = 0, sumB = 0;
-			for(unsigned short  x = 0; x <= (size+size); x++) {
-				for(unsigned short y = bottomY; y <= topY; y++) {
-					int offsetOfThePixel = (imageIn->x * y + x);
-					sumR += imageIn->data[offsetOfThePixel].red;
-					sumG += imageIn->data[offsetOfThePixel].green;
-					sumB += imageIn->data[offsetOfThePixel].blue;
+			for(unsigned short senterX = size; senterX < imageIn->x-size; senterX++) {
+				int offsetOfThePixel = (imageIn->x * senterY + senterX);
+				unsigned short bY = senterY-size;
+				unsigned short tY = senterY+size;
+				unsigned short bX = senterX-size;
+				unsigned short tX = senterX+size;
+				float sumR = 0, sumG = 0, sumB = 0;
+				for(unsigned short  x = bX; x <= tX; x++) {
+					for(unsigned short y = bY; y <= tY; y++) {
+						short gausPos = (dim*(y-bY) + x-bX);
+						int oP = (imageIn->x * y + x);
+						sumR += imageIn->data[oP].red * gausMat[gausPos];
+						sumG += imageIn->data[oP].green * gausMat[gausPos];
+						sumB += imageIn->data[oP].blue * gausMat[gausPos];
+					}
 				}
+				imageOut->data[offsetOfThePixel].red = sumR;
+				imageOut->data[offsetOfThePixel].green = sumG;
+				imageOut->data[offsetOfThePixel].blue = sumB;
 			}
-			imageOut->data[offsetOfThePixel].red = sumR*numElements;
-			imageOut->data[offsetOfThePixel].green = sumG*numElements;
-			imageOut->data[offsetOfThePixel].blue = sumB*numElements;
-			int yRow = imageIn->x * bottomY;
-			for(unsigned short senterX = size+1; senterX < imageIn->x-size; senterX++) {
-				// For each pixel we compute the magic number
-				offsetOfThePixel = (imageIn->x * senterY + senterX);
-				unsigned short leftX = senterX-size-1;
-				unsigned short  rightX = senterX+size;
-				float sumAddR = 0, sumSubR = 0;
-				float sumAddG = 0, sumSubG = 0;
-				float sumAddB = 0, sumSubB = 0;
-				int leftOffset = (yRow+ leftX);
-				int rightOffset = (yRow + rightX);
-				for(int y = bottomY; y <= topY; y++) {
-					sumSubR += imageIn->data[leftOffset].red;
-					sumAddR += imageIn->data[rightOffset].red;
-					sumSubG += imageIn->data[leftOffset].green;
-					sumAddG += imageIn->data[rightOffset].green;
-					sumAddB += imageIn->data[rightOffset].blue;
-					sumSubB += imageIn->data[leftOffset].blue;
-					leftOffset+=imageIn->x;
-					rightOffset+=imageIn->x;
-				}
-				sumR= sumR+sumAddR-sumSubR;
-				sumG= sumG+sumAddG-sumSubG;
-				sumB= sumB+sumAddB-sumSubB;
-
-				imageOut->data[offsetOfThePixel].red = sumR*numElements;
-				imageOut->data[offsetOfThePixel].green = sumG*numElements;
-				imageOut->data[offsetOfThePixel].blue = sumB*numElements;
-			}
-
 		}
 	}	
 }
@@ -222,7 +219,7 @@ PPMImage * imageDifference(AccurateImage *imageInSmall, AccurateImage *imageInLa
 	
 	imageOut->x = imageInSmall->x;
 	imageOut->y = imageInSmall->y;
-	
+
 	#pragma omp parallel 
 	{
 		int thread_id = omp_get_thread_num();
@@ -231,41 +228,9 @@ PPMImage * imageDifference(AccurateImage *imageInSmall, AccurateImage *imageInLa
 		int tileStart = tilePart*thread_id;
 		int top = ((tileStart+tilePart)<dim)?((tileStart+tilePart)):dim;
 		for(int i = tileStart; i < top; i++) {
-			float value = (imageInLarge->data[i].red - imageInSmall->data[i].red);
-
-			if (value < -1.0) {
-				value = 257.0+value;
-			} else if (value > -1.0 && value < 0.0) {
-				value = 0;
-			}
-
-			if(value > 255)
-				imageOut->data[i].red = 255.0;
-			else {
-				imageOut->data[i].red = floor(value);
-			}
-
-			value = (imageInLarge->data[i].green - imageInSmall->data[i].green);
-			if (value < -1.0) {
-				value = 257.0+value;
-			} else if (value > -1.0 && value < 0.0) {
-				value = 0;
-			} 
-			if(value > 255)
-				imageOut->data[i].green = 255;
-			else
-				imageOut->data[i].green = floor(value);
-
-			value = (imageInLarge->data[i].blue - imageInSmall->data[i].blue);
-			if (value < -1.0) {
-				value = 257.0+value;
-			} else if (value > -1.0 && value < 0.0) {
-				value = 0;
-			}
-			if(value > 255)
-				imageOut->data[i].blue = 255;
-			else
-				imageOut->data[i].blue = floor(value);
+			imageOut->data[i].red =((int)(imageInLarge->data[i].red - imageInSmall->data[i].red))%255;
+			imageOut->data[i].green = ((int)(imageInLarge->data[i].green - imageInSmall->data[i].green))%255;
+			imageOut->data[i].blue = ((int)(imageInLarge->data[i].blue - imageInSmall->data[i].blue))%255;
 		}
 	}
 	return imageOut;
@@ -286,18 +251,12 @@ int main(int argc, char** argv) {
     }
 	
 	AccurateImage *imageAccurate = convertToAccurateImage(image);
-
 	AccurateImage *imageAccurate1_tiny = convertToBlankAccurateImage(image);
 	AccurateImage *imageAccurate2_tiny = convertToBlankAccurateImage(image);
 	
 	// Process the tiny case:
 	int size = 2;
 	blurIteration(imageAccurate2_tiny, imageAccurate, size);
-	
-	blurIteration(imageAccurate1_tiny, imageAccurate2_tiny, size);
-	blurIteration(imageAccurate2_tiny, imageAccurate1_tiny, size);
-	blurIteration(imageAccurate1_tiny, imageAccurate2_tiny, size);
-	blurIteration(imageAccurate2_tiny, imageAccurate1_tiny, size);
 	
 	
 	
@@ -308,10 +267,6 @@ int main(int argc, char** argv) {
 
 	size = 3;
 	blurIteration(imageAccurate2_small, imageAccurate, size);
-	blurIteration(imageAccurate1_small, imageAccurate2_small, size);
-	blurIteration(imageAccurate2_small, imageAccurate1_small, size);
-	blurIteration(imageAccurate1_small, imageAccurate2_small, size);
-	blurIteration(imageAccurate2_small, imageAccurate1_small, size);
 
 
     // an intermediate step can be saved for debugging like this
@@ -324,10 +279,6 @@ int main(int argc, char** argv) {
 
 	size = 5;
 	blurIteration(imageAccurate2_medium, imageAccurate, size);
-	blurIteration(imageAccurate1_medium, imageAccurate2_medium, size);
-	blurIteration(imageAccurate2_medium, imageAccurate1_medium, size);
-	blurIteration(imageAccurate1_medium, imageAccurate2_medium, size);
-	blurIteration(imageAccurate2_medium, imageAccurate1_medium, size);
 
 	
 	AccurateImage *imageAccurate1_large = convertToBlankAccurateImage(image);
@@ -336,13 +287,9 @@ int main(int argc, char** argv) {
 	// Do each color channel
 	size = 8;
 	blurIteration(imageAccurate2_large, imageAccurate, size);
-	blurIteration(imageAccurate1_large, imageAccurate2_large, size);
-	blurIteration(imageAccurate2_large, imageAccurate1_large, size);
-	blurIteration(imageAccurate1_large, imageAccurate2_large, size);
-	blurIteration(imageAccurate2_large, imageAccurate1_large, size);
 
 	// calculate difference
-	PPMImage *final_tiny = imageDifference(imageAccurate2_tiny, imageAccurate2_small);
+	PPMImage *final_tiny = convertToPPPMImage(imageAccurate1_tiny);//imageDifference(imageAccurate2_tiny, imageAccurate2_small);
     PPMImage *final_small = imageDifference(imageAccurate2_small, imageAccurate2_medium);
     PPMImage *final_medium = imageDifference(imageAccurate2_medium, imageAccurate2_large);
 	// Save the images.
@@ -355,6 +302,7 @@ int main(int argc, char** argv) {
         writeStreamPPM(stdout, final_small);
         writeStreamPPM(stdout, final_medium);
     }
+	
 	
 }
 
