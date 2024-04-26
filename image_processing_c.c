@@ -132,6 +132,23 @@ void blurCornersIteration(AccurateImage *imageOut, AccurateImage *imageIn, int s
 		}
 	}
 }
+
+void iterate_sub_col(AccuratePixel* cols, int* index, int width, float red, float green, float blue) {
+	*index+=1;
+	if (*index >= width) *index = 0;
+
+	cols[*index].red = red;
+	cols[*index].green = green;
+	cols[*index].blue = blue;
+
+}
+
+AccuratePixel* take_col(AccuratePixel* cols, int* index, int width) {
+	*index+=1;
+	if (*index >= width) *index = 0;
+	return &cols[*index];
+}
+
 void blurIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
 	
 	// Iterate over each pixel
@@ -143,21 +160,32 @@ void blurIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
 		unsigned short  tilePart = imageIn->y/n_threads;
 		unsigned short  tileStart = tilePart*thread_id;
 		unsigned short topY = ((tileStart+tilePart)< imageIn->y)?((tileStart+tilePart)):(imageIn->y);
+		
+		unsigned short width = size+size+1;
+		AccuratePixel* prev_col_val = malloc(width*sizeof(AccuratePixel)); 
+		int* rep_col_pointer = 0;
+		int* col_pointer = 0;
+		
 		for(unsigned short senterY = tileStart; senterY < topY; senterY++) {
 			unsigned short topY = (senterY+size < imageIn->y)? senterY+size:imageIn->y-1;
 			unsigned short bottomY = ((senterY-size)>0)? senterY-size:0;
 
-			float numElements = (2*size+1)*(topY-bottomY+1);
+			float numElements = (size+size+1)*(topY-bottomY+1);
 			numElements = pow(numElements,-1);
 			int offsetOfThePixel = (imageIn->x * senterY + size);
 			float sumR = 0, sumG = 0, sumB = 0;
 			for(unsigned short  x = 0; x <= (size+size); x++) {
+				float csumR = 0, csumG = 0, csumB = 0;
 				for(unsigned short y = bottomY; y <= topY; y++) {
 					int offsetOfThePixel = (imageIn->x * y + x);
-					sumR += imageIn->data[offsetOfThePixel].red;
-					sumG += imageIn->data[offsetOfThePixel].green;
-					sumB += imageIn->data[offsetOfThePixel].blue;
+					csumR += imageIn->data[offsetOfThePixel].red;
+					csumG += imageIn->data[offsetOfThePixel].green;
+					csumB += imageIn->data[offsetOfThePixel].blue;
 				}
+				iterate_sub_col(prev_col_val,&rep_col_pointer, width, csumR, csumG, csumB);
+				sumR+=csumR;
+				sumG+=csumG;
+				sumB+=csumB;
 			}
 			imageOut->data[offsetOfThePixel].red = sumR*numElements;
 			imageOut->data[offsetOfThePixel].green = sumG*numElements;
@@ -168,24 +196,21 @@ void blurIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
 				offsetOfThePixel = (imageIn->x * senterY + senterX);
 				unsigned short leftX = senterX-size-1;
 				unsigned short  rightX = senterX+size;
-				float sumAddR = 0, sumSubR = 0;
-				float sumAddG = 0, sumSubG = 0;
-				float sumAddB = 0, sumSubB = 0;
-				int leftOffset = (yRow+ leftX);
 				int rightOffset = (yRow + rightX);
+				float csumR = 0, csumG = 0, csumB = 0;
 				for(int y = bottomY; y <= topY; y++) {
-					sumSubR += imageIn->data[leftOffset].red;
-					sumAddR += imageIn->data[rightOffset].red;
-					sumSubG += imageIn->data[leftOffset].green;
-					sumAddG += imageIn->data[rightOffset].green;
-					sumAddB += imageIn->data[rightOffset].blue;
-					sumSubB += imageIn->data[leftOffset].blue;
-					leftOffset+=imageIn->x;
+					csumR += imageIn->data[rightOffset].red;
+					csumG+= imageIn->data[rightOffset].green;
+					csumB+= imageIn->data[rightOffset].blue;
 					rightOffset+=imageIn->x;
 				}
-				sumR= sumR+sumAddR-sumSubR;
-				sumG= sumG+sumAddG-sumSubG;
-				sumB= sumB+sumAddB-sumSubB;
+				AccuratePixel* r_col = take_col(prev_col_val, &col_pointer, width);
+				
+				sumR= sumR+csumR-r_col->red;
+				sumG= sumG+csumG-r_col->green;
+				sumB= sumB+csumB-r_col->blue;
+				
+				iterate_sub_col(prev_col_val,&rep_col_pointer, width, csumR, csumG, csumB);
 
 				imageOut->data[offsetOfThePixel].red = sumR*numElements;
 				imageOut->data[offsetOfThePixel].green = sumG*numElements;
