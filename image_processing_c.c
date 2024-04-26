@@ -209,15 +209,15 @@ PPMImage * imageDifference(AccurateImage *imageInSmall, AccurateImage *imageInLa
 	
 	#pragma omp parallel 
 	{
-		int thread_id = omp_get_thread_num();
-		int n_threads = omp_get_num_threads();
+		short thread_id = omp_get_thread_num();
+		short n_threads = omp_get_num_threads();
 		int tilePart = (dim)/n_threads;
 		int tileStart = tilePart*thread_id;
 		int top = ((tileStart+tilePart)<dim)?((tileStart+tilePart)):dim;
 		for(int i = tileStart; i < top; i++) {
-			imageOut->data[i].red =((int)(imageInLarge->data[i].red - imageInSmall->data[i].red))%255;
-			imageOut->data[i].green = ((int)(imageInLarge->data[i].green - imageInSmall->data[i].green))%255;
-			imageOut->data[i].blue = ((int)(imageInLarge->data[i].blue - imageInSmall->data[i].blue))%255;
+			imageOut->data[i].red =((short)(imageInLarge->data[i].red - imageInSmall->data[i].red))%255;
+			imageOut->data[i].green = ((short)(imageInLarge->data[i].green - imageInSmall->data[i].green))%255;
+			imageOut->data[i].blue = ((short)(imageInLarge->data[i].blue - imageInSmall->data[i].blue))%255;
 		}
 	}
 	return imageOut;
