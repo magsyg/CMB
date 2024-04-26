@@ -82,43 +82,27 @@ PPMImage * convertToPPPMImage(AccurateImage *imageIn) {
 
 // blur one color channel
 void blurCornersIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
-	unsigned short corners[4][4] = {
+	unsigned short corners[2][4] = {
 		{
 			0, size,
-			0, imageIn->x
 		}, 
 		{
-			imageIn->y-size, imageIn->y,
-			0, imageIn->x
-		}, 
-		{
-			0, imageIn->y,
-			0, size,
-		}, 
-		{
-			0, imageIn->y,
 			imageIn->x-size, imageIn->x,
 		}
 	};
 
 	
-	for(unsigned short  i = 0; i < 4; i++) {	
+	for(unsigned short  i = 0; i < 2; i++) {	
 	#pragma omp parallel 
 	{
 		unsigned short thread_id = omp_get_thread_num();
 		unsigned short n_threads = omp_get_num_threads();
-		short sY = corners[i][0], eY = corners[i][1];
-		short sX = corners[i][2], eX = corners[i][3];
-		if (i >= 2) {
-			unsigned short tilePart = (eY-sY)/n_threads;
-			sY = tilePart*thread_id + sY;
-			eY = ((sY+tilePart)< corners[i][1])?((sY+tilePart)):(corners[i][1]);
-		} else {
-			unsigned short tilePart = (eX-sX)/n_threads;
-			sX = tilePart*thread_id + sX;
-			eX = ((sX+tilePart)< corners[i][3])?((sX+tilePart)):(corners[i][3]);
-		}
-		for(short senterY = sY; senterY < eY; senterY++) {
+		short sX = corners[i][0], eX = corners[i][1];
+		unsigned short tilePart = (imageIn->y)/n_threads;
+		unsigned short tileStart = tilePart*thread_id;
+		unsigned short topY = ((tileStart+tilePart)< imageIn->y)?((tileStart+tilePart)):(imageIn->y);
+	
+		for(short senterY = tileStart; senterY < topY; senterY++) {
 			unsigned short endY = (senterY+size < imageIn->y)? senterY+size+1:imageIn->y;
 			unsigned short startY = ((senterY-size)>0)? senterY-size:0;
 			for(short senterX = sX; senterX < eX; senterX++) {
@@ -151,20 +135,21 @@ void blurCornersIteration(AccurateImage *imageOut, AccurateImage *imageIn, int s
 void blurIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
 	
 	// Iterate over each pixel
-	float numElements = (2*size+1)*(2*size+1);
-	numElements = pow(numElements,-1);
 	blurCornersIteration(imageOut, imageIn, size);
 	#pragma omp parallel 
 	{
 		unsigned short  thread_id = omp_get_thread_num();
 		unsigned short  n_threads = omp_get_num_threads();
 		unsigned short  tilePart = imageIn->y/n_threads;
-		unsigned short  tileStart = tilePart*thread_id + size;
-		unsigned short topY = ((tileStart+tilePart)< imageIn->y-size)?((tileStart+tilePart)):(imageIn->y-size);
+		unsigned short  tileStart = tilePart*thread_id;
+		unsigned short topY = ((tileStart+tilePart)< imageIn->y)?((tileStart+tilePart)):(imageIn->y);
 		for(unsigned short senterY = tileStart; senterY < topY; senterY++) {
+			unsigned short topY = (senterY+size < imageIn->y)? senterY+size:imageIn->y-1;
+			unsigned short bottomY = ((senterY-size)>0)? senterY-size:0;
+
+			float numElements = (2*size+1)*(topY-bottomY+1);
+			numElements = pow(numElements,-1);
 			int offsetOfThePixel = (imageIn->x * senterY + size);
-			unsigned short  bottomY = senterY-size;
-			unsigned short topY = senterY+size;
 			float sumR = 0, sumG = 0, sumB = 0;
 			for(unsigned short  x = 0; x <= (size+size); x++) {
 				for(unsigned short y = bottomY; y <= topY; y++) {
@@ -206,7 +191,6 @@ void blurIteration(AccurateImage *imageOut, AccurateImage *imageIn, int size) {
 				imageOut->data[offsetOfThePixel].green = sumG*numElements;
 				imageOut->data[offsetOfThePixel].blue = sumB*numElements;
 			}
-
 		}
 	}	
 }
@@ -231,41 +215,9 @@ PPMImage * imageDifference(AccurateImage *imageInSmall, AccurateImage *imageInLa
 		int tileStart = tilePart*thread_id;
 		int top = ((tileStart+tilePart)<dim)?((tileStart+tilePart)):dim;
 		for(int i = tileStart; i < top; i++) {
-			float value = (imageInLarge->data[i].red - imageInSmall->data[i].red);
-
-			if (value < -1.0) {
-				value = 257.0+value;
-			} else if (value > -1.0 && value < 0.0) {
-				value = 0;
-			}
-
-			if(value > 255)
-				imageOut->data[i].red = 255.0;
-			else {
-				imageOut->data[i].red = floor(value);
-			}
-
-			value = (imageInLarge->data[i].green - imageInSmall->data[i].green);
-			if (value < -1.0) {
-				value = 257.0+value;
-			} else if (value > -1.0 && value < 0.0) {
-				value = 0;
-			} 
-			if(value > 255)
-				imageOut->data[i].green = 255;
-			else
-				imageOut->data[i].green = floor(value);
-
-			value = (imageInLarge->data[i].blue - imageInSmall->data[i].blue);
-			if (value < -1.0) {
-				value = 257.0+value;
-			} else if (value > -1.0 && value < 0.0) {
-				value = 0;
-			}
-			if(value > 255)
-				imageOut->data[i].blue = 255;
-			else
-				imageOut->data[i].blue = floor(value);
+			imageOut->data[i].red =((int)(imageInLarge->data[i].red - imageInSmall->data[i].red))%255;
+			imageOut->data[i].green = ((int)(imageInLarge->data[i].green - imageInSmall->data[i].green))%255;
+			imageOut->data[i].blue = ((int)(imageInLarge->data[i].blue - imageInSmall->data[i].blue))%255;
 		}
 	}
 	return imageOut;
@@ -313,10 +265,6 @@ int main(int argc, char** argv) {
 	blurIteration(imageAccurate1_small, imageAccurate2_small, size);
 	blurIteration(imageAccurate2_small, imageAccurate1_small, size);
 
-
-    // an intermediate step can be saved for debugging like this
-//    writePPM("imageAccurate2_tiny.ppm", convertToPPPMImage(imageAccurate2_tiny));
-	
 	AccurateImage *imageAccurate1_medium = convertToBlankAccurateImage(image);
 	AccurateImage *imageAccurate2_medium = convertToBlankAccurateImage(image);
 	

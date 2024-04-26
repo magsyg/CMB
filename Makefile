@@ -5,7 +5,8 @@ CC:=gcc
 CXX:=g++
 CFLAGS:=-g -fno-omit-frame-pointer -O2 -I. -fopenmp -std=c99
 CXXFLAGS:=-g -fno-omit-frame-pointer -O2 -I. -fopenmp -std=c++14 -DON_VM
-LDFLAGS:=-lOpenCL -lpthread -fopenmp -DHAVE_OPENMP
+LDFLAGS:= -lpthread -fopenmp -DHAVE_OPENMP
+#-lOpenCL
 C_SOURCES=$(wildcard *.c)
 CPP_SOURCES=$(wildcard *.cpp)
 OBJECTS:=$(C_SOURCES:.c=.o) $(CPP_SOURCES:.cpp=.o)
@@ -46,10 +47,10 @@ perf: $(EXECUTABLE)
 zip: $(C_SOURCES) $(CPP_SOURCES) $(HEADERS) image_processing_opencl.cl
 	zip submission_opencl.zip ppm.c ppm.h image_processing_opencl.cpp image_processing_opencl.cl
 
-#ifeq ($(VERSION), c)
-#zip: $(C_SOURCES) $(CPP_SOURCES) $(HEADERS)
-#	zip submission_c.zip ppm.c ppm.h image_processing_c.c
-#else
+ifeq ($(VERSION), c)
+zip: $(C_SOURCES) $(CPP_SOURCES) $(HEADERS)
+	zip submission_c.zip ppm.c ppm.h image_processing_c.c
+else
 zip: $(C_SOURCES) $(CPP_SOURCES) $(HEADERS) image_processing_opencl.cl
 	zip submission_opencl.zip ppm.c ppm.h image_processing_opencl.cpp image_processing_opencl.cl
-#endif
+endif
